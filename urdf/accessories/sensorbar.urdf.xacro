@@ -1,0 +1,177 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+  <!-- <include filename="$(find dingo_description)/urdf/accessories/realsense.urdf.xacro" />   -->
+  <xacro:macro name="intel_realsense_mount" params="prefix topic parent_link yaw:=0">
+
+    <xacro:macro name="intel_realsense" params="
+               frame:=realsense          topic:=realsense
+               h_fov:=1.5184351666666667 v_fov:=1.0122901111111111
+               min_range:=0.105          max_range:=8.0
+               width:=640                height:=480
+               update_rate:=30
+               robot_namespace:=/">
+
+      <!-- this link is the origin for the camera's data -->
+      <link name="${frame}" />
+
+      <!--
+        The gazebo plugin aligns the depth data with the Z axis, with X=left and Y=up
+        ROS expects the depth data along the X axis, with Y=left and Z=up
+        This link only exists to give the gazebo plugin the correctly-oriented frame
+      -->
+      <link name="${frame}_gazebo" />
+      <joint name="${frame}_gazebo_joint" type="fixed">
+        <!-- <xacro:insert_block name="origin" /> -->
+        <parent link="${frame}"/>
+        <child link="${frame}_gazebo"/>
+        <origin xyz="0.0 0 0" rpy="-1.5707963267948966 0 -1.5707963267948966"/>
+      </joint>
+
+      <gazebo reference="${frame}">
+        <turnGravityOff>true</turnGravityOff>
+        <sensor type="depth" name="${prefix}_realsense_depth">
+          <update_rate>${update_rate}</update_rate>
+          <camera>
+            <!-- 75x65 degree FOV for the depth sensor -->
+            <horizontal_fov>${h_fov}</horizontal_fov>
+            <vertical_fov>${v_fov}</vertical_fov>
+
+            <image>
+              <width>${width}</width>
+              <height>${height}</height>
+              <!-- TODO: check what format the Realsense hardware delivers and set this to match! -->
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <!-- give the color sensor a maximum range of 50m so that the simulation renders nicely -->
+              <near>0.01</near>
+              <far>50.0</far>
+            </clip>
+          </camera>
+          <plugin name="kinect_controller" filename="libgazebo_ros_openni_kinect.so">
+            <baseline>0.2</baseline>
+            <alwaysOn>true</alwaysOn>
+            <updateRate>${update_rate}</updateRate>
+            <cameraName>${topic}</cameraName>
+            <imageTopicName>color/image_raw</imageTopicName>
+            <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
+            <depthImageTopicName>depth/image_rect_raw</depthImageTopicName>
+            <depthImageInfoTopicName>depth/camera_info</depthImageInfoTopicName>
+            <pointCloudTopicName>depth/color/points</pointCloudTopicName>
+            <frameName>${frame}_gazebo</frameName>
+            <pointCloudCutoff>${min_range}</pointCloudCutoff>
+            <pointCloudCutoffMax>${max_range}</pointCloudCutoffMax>
+            <distortionK1>0.00000001</distortionK1>
+            <distortionK2>0.00000001</distortionK2>
+            <distortionK3>0.00000001</distortionK3>
+            <distortionT1>0.00000001</distortionT1>
+            <distortionT2>0.00000001</distortionT2>
+            <CxPrime>0</CxPrime>
+            <Cx>0</Cx>
+            <Cy>0</Cy>
+            <focalLength>0</focalLength>
+            <hackBaseline>0</hackBaseline>
+          </plugin>
+        </sensor>
+      </gazebo>
+    </xacro:macro>
+
+    <link name="${prefix}_realsense_lens">
+      <visual>
+        <!--
+          the model's origin is in the middle & it's rotated to lie in
+          the optical standard with X left, Y up, and Z forward
+        -->
+        <origin xyz="0 0 0" rpy="1.570796 0 1.570796" />
+        <geometry>
+          <!-- Origin of this mesh is the base of the bracket. -->
+          <mesh filename="package://realsense2_description/meshes/d415.stl" />
+        </geometry>
+        <material name="white" />
+      </visual>
+    </link>
+
+    <joint type="fixed" name="${prefix}_realsense_lens_joint">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${parent_link}" />
+      <child link="${prefix}_realsense_lens" />
+    </joint>
+    <joint type="fixed" name="${prefix}_realsense_joint">
+      <origin xyz="0 0 0" rpy="0 0 ${yaw}" />
+      <parent link="${prefix}_realsense_lens" />
+      <child link="${prefix}_realsense" />
+    </joint>
+
+    <xacro:intel_realsense frame="${prefix}_realsense" topic="${topic}"/>
+  </xacro:macro>
+  
+  <xacro:macro name="sensorbar" params="prefix parent_link height:=1.0 *origin">
+    <!--
+      The VLP16 is mounted to a pair of extrusion rods on top of the main sensor arch
+    -->
+    <link name="${prefix}sensorbar_base_link" />
+    <link name="${prefix}sensorbar_support">
+      <visual>
+        <geometry>
+          <box size="0.03 0.03 ${height}" />
+        </geometry>
+        <material name="black">
+          <color rgba="255 255 255 1" />
+        </material>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+      </visual>
+      <collision>
+        <geometry>
+          <box size="0.03 0.03 ${height}" />
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+      </collision>
+    </link>
+
+    <link name="realsense_top_mount">
+
+    </link>
+    <link name="realsense_mid_mount" >
+
+    </link>
+    <link name="realsense_low_mount" >
+
+    </link>
+
+
+    <joint name="${prefix}sensorbar_base_link_joint" type="fixed">
+      <parent link="${parent_link}" />
+      <child link="${prefix}sensorbar_base_link" />
+      <xacro:insert_block name="origin" />
+    </joint>
+    <joint name="${prefix}sensorbar_support" type="fixed">
+      <parent link="${prefix}sensorbar_base_link" />
+      <child link="${prefix}sensorbar_support" />
+      <origin xyz="0 0 ${height/2}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="realsense_top_mount_joint" type="fixed">
+      <parent link="${prefix}sensorbar_base_link" />
+      <child link="realsense_top_mount" />
+      <origin xyz="0.015 0 ${height}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="realsense_mid_mount_joint" type="fixed">
+      <parent link="${prefix}sensorbar_base_link" />
+      <child link="realsense_mid_mount" />
+      <origin xyz="0.015 0 ${height - 0.3}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="realsense_low_mount_joint" type="fixed">
+      <parent link="${prefix}sensorbar_base_link" />
+      <child link="realsense_low_mount" />
+      <origin xyz="0.015 0 ${height - 0.6}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+
+    <xacro:intel_realsense_mount prefix="realsense_top" topic="realsense_top" parent_link="realsense_top_mount" yaw="0"/>
+    <xacro:intel_realsense_mount prefix="realsense_mid" topic="realsense_mid" parent_link="realsense_mid_mount" yaw="0"/>
+    <xacro:intel_realsense_mount prefix="realsense_low" topic="realsense_low" parent_link="realsense_low_mount" yaw="0"/>
+
+</robot>
